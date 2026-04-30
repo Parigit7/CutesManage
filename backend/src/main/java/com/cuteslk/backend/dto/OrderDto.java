@@ -1,11 +1,15 @@
 package com.cuteslk.backend.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 public class OrderDto {
+    @NotBlank(message = "Order ID is required")
     private String orderId;
+    
     private String packingType;
     private BigDecimal boxPrice;
     private LocalDate requiredDate;
@@ -13,6 +17,20 @@ public class OrderDto {
     private String status;
     private String courierName;
     private String courierNumber;
+    private String createdBy;
+    private String packedBy;
+
+    @JsonProperty("customerName")
+    private String customerName;
+
+    @JsonProperty("customerAddress")
+    private String customerAddress;
+
+    @JsonProperty("customerPhone1")
+    private String customerPhone1;
+
+    @JsonProperty("customerPhone2")
+    private String customerPhone2;
     private List<OrderItemDto> orderItems;
 
     public OrderDto() {}
@@ -35,4 +53,16 @@ public class OrderDto {
     public void setCourierNumber(String courierNumber) { this.courierNumber = courierNumber; }
     public List<OrderItemDto> getOrderItems() { return orderItems; }
     public void setOrderItems(List<OrderItemDto> orderItems) { this.orderItems = orderItems; }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public String getPackedBy() { return packedBy; }
+    public void setPackedBy(String packedBy) { this.packedBy = packedBy; }
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+    public String getCustomerAddress() { return customerAddress; }
+    public void setCustomerAddress(String customerAddress) { this.customerAddress = customerAddress; }
+    public String getCustomerPhone1() { return customerPhone1; }
+    public void setCustomerPhone1(String customerPhone1) { this.customerPhone1 = customerPhone1; }
+    public String getCustomerPhone2() { return customerPhone2; }
+    public void setCustomerPhone2(String customerPhone2) { this.customerPhone2 = customerPhone2; }
 }

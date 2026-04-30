@@ -12,6 +12,10 @@ function AddOrderPage() {
   const [boxPrice, setBoxPrice] = useState('');
   const [requiredDate, setRequiredDate] = useState('');
   const [message, setMessage] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerPhone1, setCustomerPhone1] = useState('');
+  const [customerPhone2, setCustomerPhone2] = useState('');
   const [orderItems, setOrderItems] = useState([]);
 
   const [items, setItems] = useState([]);
@@ -52,6 +56,10 @@ function AddOrderPage() {
         setBoxPrice(order.boxPrice || '');
         setRequiredDate(order.requiredDate);
         setMessage(order.message || '');
+        setCustomerName(order.customerName || '');
+        setCustomerAddress(order.customerAddress || '');
+        setCustomerPhone1(order.customerPhone1 || '');
+        setCustomerPhone2(order.customerPhone2 || '');
         setOrderItems(order.orderItems || []);
       } else {
         setError('Order not found.');
@@ -80,6 +88,14 @@ function AddOrderPage() {
     if (!quantity || quantity <= 0) return;
 
     const qty = parseInt(quantity, 10);
+    
+    // Check available quantity for selected color
+    const colorInfo = selectedItem.colors.find(c => c.name === selectedColor);
+    if (colorInfo && qty > colorInfo.qty) {
+      alert(`Insufficient stock! Only ${colorInfo.qty} available for ${selectedColor}.`);
+      return;
+    }
+
     const totalPrice = qty * selectedItem.price;
 
     const newItem = {
@@ -109,6 +125,9 @@ function AddOrderPage() {
 
     if (!orderId) return setError('Order ID is required.');
     if (!requiredDate) return setError('Required Date is required.');
+    if (!customerName) return setError('Customer Name is required.');
+    if (!customerAddress) return setError('Customer Address is required.');
+    if (!customerPhone1) return setError('Primary Phone Number is required.');
     if (orderItems.length === 0) return setError('Please add at least one item.');
 
     const payload = {
@@ -118,6 +137,10 @@ function AddOrderPage() {
       requiredDate,
       message,
       status: 'PENDING',
+      customerName,
+      customerAddress,
+      customerPhone1,
+      customerPhone2,
       orderItems
     };
 
@@ -126,15 +149,21 @@ function AddOrderPage() {
       if (isEditing) {
         await api.put(`/orders/${orderId}`, payload);
         setSuccess('Order updated successfully.');
+        loadData(); // Refresh inventory after update
       } else {
         await api.post('/orders', payload);
         setSuccess('Order created successfully.');
+        loadData(); // Refresh inventory after creation
         // Reset form
         setOrderId('');
         setPackingType('No box');
         setBoxPrice('');
         setRequiredDate('');
         setMessage('');
+        setCustomerName('');
+        setCustomerAddress('');
+        setCustomerPhone1('');
+        setCustomerPhone2('');
         setOrderItems([]);
       }
     } catch (err) {
@@ -198,7 +227,7 @@ function AddOrderPage() {
                   <li key={item.id} className="flex items-center justify-between p-3 hover:bg-slate-50">
                     <div>
                       <p className="font-semibold text-slate-950">{item.code} - {item.title}</p>
-                      <p className="text-xs text-slate-500">${item.price.toFixed(2)}</p>
+                      <p className="text-xs text-slate-500">Rs. {item.price.toFixed(2)}</p>
                     </div>
                     <button
                       type="button"
@@ -230,7 +259,7 @@ function AddOrderPage() {
                           className={`h-8 w-8 rounded-full border-2 transition-all ${
                             selectedColor === c.name ? 'border-slate-900 scale-125 shadow-md' : 'border-slate-200 hover:scale-110'
                           }`}
-                          style={{ backgroundColor: c.name }}
+                          style={{ backgroundColor: c.name === 'Default' ? '#94a3b8' : c.name }}
                           title={c.name}
                         />
                       ))}
@@ -252,7 +281,7 @@ function AddOrderPage() {
 
               <div className="flex items-center justify-between pt-2">
                 <p className="font-semibold text-slate-950">
-                  Total: ${(selectedItem.price * (parseInt(quantity) || 0)).toFixed(2)}
+                  Total: Rs. {(selectedItem.price * (parseInt(quantity) || 0)).toFixed(2)}
                 </p>
                 <button
                   type="button"
@@ -283,6 +312,57 @@ function AddOrderPage() {
             />
           </label>
 
+          <div className="grid gap-6 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">Customer Details</h4>
+            
+            <label className="grid gap-2 text-sm text-slate-600">
+              Customer Name *
+              <input
+                required
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                placeholder="Full name"
+              />
+            </label>
+
+            <label className="grid gap-2 text-sm text-slate-600">
+              Delivery Address *
+              <textarea
+                required
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                rows="3"
+                placeholder="Complete address for delivery"
+              />
+            </label>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-2 text-sm text-slate-600">
+                Phone Number 1 *
+                <input
+                  required
+                  type="tel"
+                  value={customerPhone1}
+                  onChange={(e) => setCustomerPhone1(e.target.value)}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  placeholder="07X XXXXXXX"
+                />
+              </label>
+              <label className="grid gap-2 text-sm text-slate-600">
+                Phone Number 2
+                <input
+                  type="tel"
+                  value={customerPhone2}
+                  onChange={(e) => setCustomerPhone2(e.target.value)}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  placeholder="Optional"
+                />
+              </label>
+            </div>
+          </div>
+
           <label className="grid gap-2 text-sm text-slate-600">
             Required Date
             <input
@@ -290,7 +370,8 @@ function AddOrderPage() {
               required
               value={requiredDate}
               onChange={(e) => setRequiredDate(e.target.value)}
-              className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+              onClick={(e) => e.target.showPicker?.()}
+              className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 cursor-pointer"
             />
           </label>
 
@@ -350,13 +431,16 @@ function AddOrderPage() {
                       <p className="font-semibold">{item.itemCode}</p>
                       <p className="text-slate-500 flex items-center gap-1.5 mt-0.5">
                         {item.color && item.color !== 'N/A' && (
-                          <span className="w-3 h-3 rounded-full border border-slate-300 inline-block shadow-sm" style={{ backgroundColor: item.color }}></span>
+                          <span className="w-3 h-3 rounded-full border border-slate-300 inline-block shadow-sm" style={{ backgroundColor: item.color === 'Default' ? '#94a3b8' : item.color }}></span>
                         )}
-                        <span>{item.color} x {item.quantity}</span>
+                        {!item.color?.startsWith('#') && (
+                          <span>{item.color}</span>
+                        )}
+                        <span className="font-semibold text-slate-900">x {item.quantity}</span>
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="font-semibold">${item.totalPrice.toFixed(2)}</span>
+                      <span className="font-semibold">Rs. {item.totalPrice.toFixed(2)}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(index)}
@@ -371,7 +455,7 @@ function AddOrderPage() {
             )}
             
             <div className="text-right text-lg font-bold text-slate-950">
-              Grand Total: ${ (orderItems.reduce((acc, curr) => acc + curr.totalPrice, 0) + (parseFloat(boxPrice) || 0)).toFixed(2) }
+              Grand Total: Rs. { (orderItems.reduce((acc, curr) => acc + curr.totalPrice, 0) + (parseFloat(boxPrice) || 0)).toFixed(2) }
             </div>
           </div>
 

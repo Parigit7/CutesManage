@@ -7,11 +7,13 @@ import com.cuteslk.backend.model.Order;
 import com.cuteslk.backend.model.OrderItem;
 import com.cuteslk.backend.repository.OrderRepository;
 import com.cuteslk.backend.service.ItemService;
+import com.cuteslk.backend.service.OrderService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import java.security.Principal;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,12 +27,14 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @RequestMapping("/api/orders")
 public class OrderController {
 
-    private final OrderRepository orderRepository;
+    private final OrderService orderService;
     private final ItemService itemService;
+    private final OrderRepository orderRepository;
 
-    public OrderController(OrderRepository orderRepository, ItemService itemService) {
+    public OrderController(OrderRepository orderRepository, ItemService itemService, OrderService orderService) {
         this.orderRepository = orderRepository;
         this.itemService = itemService;
+        this.orderService = orderService;
     }
 
     @GetMapping
@@ -40,77 +44,39 @@ public class OrderController {
     }
 
     @PreAuthorize("hasAnyRole('SALES_MANAGEMENT', 'ADMIN')")
-    @Transactional
     @PostMapping
-    public ResponseEntity<OrderDto> createOrder(@Validated @RequestBody OrderDto dto) {
+    public ResponseEntity<OrderDto> createOrder(@Validated @RequestBody OrderDto dto, Principal principal) {
         if (orderRepository.existsById(dto.getOrderId())) {
             throw new ResponseStatusException(BAD_REQUEST, "Order ID already exists");
         }
 
-        Order order = new Order();
-        order.setOrderId(dto.getOrderId());
-        order.setPackingType(dto.getPackingType());
-        order.setBoxPrice(dto.getBoxPrice());
-        order.setRequiredDate(dto.getRequiredDate());
-        order.setMessage(dto.getMessage());
-        // Status defaults to PENDING in constructor
-
-        List<OrderItem> items = dto.getOrderItems().stream().map(itemDto -> {
-            Item item = itemService.findById(itemDto.getItemId())
-                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Item not found with id: " + itemDto.getItemId()));
-            return new OrderItem(order, item, itemDto.getColor(), itemDto.getQuantity(), itemDto.getTotalPrice());
-        }).collect(Collectors.toList());
-
-        order.setOrderItems(items);
-
-        Order saved = orderRepository.save(order);
+        Order saved = orderService.createOrder(dto, principal.getName());
         return ResponseEntity.ok(toDto(saved));
     }
 
     @PreAuthorize("hasAnyRole('SALES_MANAGEMENT', 'ADMIN')")
-    @Transactional
     @PutMapping("/{id}")
     public ResponseEntity<OrderDto> updateOrder(@PathVariable("id") String id, @Validated @RequestBody OrderDto dto) {
         Order existing = orderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Order not found"));
 
-        if (!existing.getStatus().equals("PENDING") && !dto.getStatus().equals(existing.getStatus())) {
-            // Only admins can change status from pending to packed/send, check later or handle carefully
-        }
-
-        // Sales management can only edit pending orders
-        // Note: Spring security context can be used to check role if we want to restrict editing to ONLY pending for SALES_MANAGEMENT.
-        // Assuming the requirement: "if any order in pending status sales management can edit or delete order."
-        // We will enforce this via logic:
-        // (The frontend also hides edit button if not pending).
-
-        existing.setPackingType(dto.getPackingType());
-        existing.setBoxPrice(dto.getBoxPrice());
-        existing.setRequiredDate(dto.getRequiredDate());
-        existing.setMessage(dto.getMessage());
-        
-        // Update items
-        existing.getOrderItems().clear();
-        for (OrderItemDto itemDto : dto.getOrderItems()) {
-            Item item = itemService.findById(itemDto.getItemId())
-                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Item not found with id: " + itemDto.getItemId()));
-            existing.addOrderItem(new OrderItem(existing, item, itemDto.getColor(), itemDto.getQuantity(), itemDto.getTotalPrice()));
-        }
-
-        Order saved = orderRepository.save(existing);
+        Order saved = orderService.updateOrder(existing, dto);
         return ResponseEntity.ok(toDto(saved));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'PACKAGE')")
     @Transactional
     @PutMapping("/{id}/status")
-    public ResponseEntity<OrderDto> updateOrderStatus(@PathVariable("id") String id, @RequestBody java.util.Map<String, String> body) {
+    public ResponseEntity<OrderDto> updateOrderStatus(@PathVariable("id") String id, @RequestBody java.util.Map<String, String> body, Principal principal) {
         Order existing = orderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Order not found"));
         
         String newStatus = body.get("status");
         if (newStatus != null) {
             existing.setStatus(newStatus.toUpperCase());
+            if (newStatus.equalsIgnoreCase("PACKED") || newStatus.equalsIgnoreCase("SEND")) {
+                existing.setPackedBy(principal.getName());
+            }
         }
         
         String courierName = body.get("courierName");
@@ -128,14 +94,12 @@ public class OrderController {
     }
 
     @PreAuthorize("hasAnyRole('SALES_MANAGEMENT', 'ADMIN')")
-    @Transactional
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOrder(@PathVariable("id") String id) {
         Order existing = orderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Order not found"));
                 
-        // Should ideally check status here if user is not admin
-        orderRepository.deleteById(id);
+        orderService.deleteOrder(existing);
         return ResponseEntity.noContent().build();
     }
 
@@ -149,6 +113,12 @@ public class OrderController {
         dto.setStatus(order.getStatus());
         dto.setCourierName(order.getCourierName());
         dto.setCourierNumber(order.getCourierNumber());
+        dto.setCreatedBy(order.getCreatedBy());
+        dto.setPackedBy(order.getPackedBy());
+        dto.setCustomerName(order.getCustomerName());
+        dto.setCustomerAddress(order.getCustomerAddress());
+        dto.setCustomerPhone1(order.getCustomerPhone1());
+        dto.setCustomerPhone2(order.getCustomerPhone2());
         dto.setOrderItems(order.getOrderItems().stream().map(this::toItemDto).collect(Collectors.toList()));
         return dto;
     }
